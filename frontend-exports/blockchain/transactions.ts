@@ -6,20 +6,29 @@
 
 import { Contract, JsonRpcSigner, isAddress } from "ethers";
 import { OBTENTIK_ABI } from "../ObtentikConfig";
-import { getContractAddress, getExplorerTxUrl } from "./chains";
+import {
+  getContractAddress,
+  getExplorerTxUrl,
+  POLYGON_AMOY_CHAIN,
+} from "./chains";
 import { decodeContractError } from "./errors";
 import { getBrowserProvider, isMetaMaskInstalled, switchToPolygonAmoy } from "./metamask";
+import { getUserRole } from "./readonly";
 import {
   AddCheckpointInput,
   RegisterBatchInput,
   SetBatchRecallInput,
   TransactionResult,
+  UserRole,
 } from "./types";
 
 /**
  * Helper to obtain an authenticated contract instance bound to an active signer
  */
-export async function getSignerContract(explicitSigner?: JsonRpcSigner): Promise<Contract> {
+export async function getSignerContract(
+  allowedRoles: readonly UserRole[],
+  explicitSigner?: JsonRpcSigner
+): Promise<Contract> {
   let signer = explicitSigner;
 
   if (!signer) {
@@ -28,6 +37,21 @@ export async function getSignerContract(explicitSigner?: JsonRpcSigner): Promise
     }
     const provider = getBrowserProvider();
     signer = await provider.getSigner();
+  }
+
+  const signerProvider = signer.provider;
+  if (!signerProvider) {
+    throw new Error("MetaMask belum menyediakan provider untuk menandatangani transaksi.");
+  }
+  const network = await signerProvider.getNetwork();
+  if (Number(network.chainId) !== POLYGON_AMOY_CHAIN.chainId) {
+    throw new Error("Transaksi hanya dapat ditandatangani di Polygon Amoy.");
+  }
+
+  const signerAddress = await signer.getAddress();
+  const role = await getUserRole(signerAddress);
+  if (!allowedRoles.includes(role)) {
+    throw new Error(`Peran ${role} tidak memiliki izin untuk tindakan ini.`);
   }
 
   const address = getContractAddress();
@@ -75,7 +99,7 @@ export async function registerManufacturer(
   }
 
   try {
-    const contract = await getSignerContract(signer);
+    const contract = await getSignerContract(["ADMIN"], signer);
     const tx = await contract.registerManufacturer(cleanAccount, cleanName);
     const receipt = await tx.wait(1);
 
@@ -114,7 +138,7 @@ export async function registerDistributor(
   }
 
   try {
-    const contract = await getSignerContract(signer);
+    const contract = await getSignerContract(["ADMIN"], signer);
     const tx = await contract.registerDistributor(cleanAccount, cleanName);
     const receipt = await tx.wait(1);
 
@@ -153,7 +177,7 @@ export async function registerPharmacy(
   }
 
   try {
-    const contract = await getSignerContract(signer);
+    const contract = await getSignerContract(["ADMIN"], signer);
     const tx = await contract.registerPharmacy(cleanAccount, cleanName);
     const receipt = await tx.wait(1);
 
@@ -187,7 +211,7 @@ export async function registerBatch(
   const bpomNumber = input.bpomNumber.trim();
   const lotNumber = input.lotNumber.trim();
   const facilityLocation = input.facilityLocation.trim();
-  const initialNotes = input.initialNotes?.trim() || "Batch registered and passed Quality Control";
+  const initialNotes = input.initialNotes?.trim() || "";
 
   if (!batchId) throw new Error("Batch ID wajib diisi.");
   if (!productName) throw new Error("Nama produk obat wajib diisi.");
@@ -203,7 +227,7 @@ export async function registerBatch(
   }
 
   try {
-    const contract = await getSignerContract(signer);
+    const contract = await getSignerContract(["ADMIN", "MANUFACTURER"], signer);
     const tx = await contract.registerBatch(
       batchId,
       productName,
@@ -248,7 +272,7 @@ export async function addCheckpoint(
   if (!location) throw new Error("Lokasi penerimaan/gudang wajib diisi.");
 
   try {
-    const contract = await getSignerContract(signer);
+    const contract = await getSignerContract(["DISTRIBUTOR", "PHARMACY"], signer);
     const tx = await contract.addCheckpoint(batchId, location, notes);
     const receipt = await tx.wait(1);
 
@@ -291,7 +315,7 @@ export async function setBatchRecallStatus(
   }
 
   try {
-    const contract = await getSignerContract(signer);
+    const contract = await getSignerContract(["ADMIN", "MANUFACTURER"], signer);
     const tx = await contract.setBatchRecallStatus(batchId, input.isRecalled, recallReason);
     const receipt = await tx.wait(1);
 

@@ -3,29 +3,37 @@
 @tailwind utilities;
 
 :root {
-  --background: #f8fafc;
-  --foreground: #0f172a;
+  --background: #ffffff;
+  --foreground: #102a43;
+  --navy: #102a43;
+  --teal: #2e7772;
+  --line: #dfe5df;
 }
 
 body {
   color: var(--foreground);
   background: var(--background);
   min-height: 100vh;
+  font-family: Arial, Helvetica, sans-serif;
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   -webkit-font-smoothing: antialiased;
 }
 
+.medical-ambient-bg {
+  background: #ffffff;
+}
+
 /* Custom Medical Clean Scrollbars */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
   background: #f1f5f9;
 }
 ::-webkit-scrollbar-thumb {
   background: #cbd5e1;
-  border-radius: 4px;
+  border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
@@ -35,26 +43,48 @@ body {
 @keyframes pulse-subtle {
   0%, 100% {
     opacity: 1;
+    transform: scale(1);
   }
   50% {
-    opacity: 0.5;
+    opacity: 0.6;
+    transform: scale(0.97);
   }
 }
 
 .animate-pulse-subtle {
-  animation: pulse-subtle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  animation: pulse-subtle 2.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
-/* Clean Medical Card Styles */
+/* Scanner Laser Line Animation */
+@keyframes scan-laser {
+  0% {
+    top: 5%;
+    opacity: 0.8;
+  }
+  50% {
+    top: 92%;
+    opacity: 1;
+  }
+  100% {
+    top: 5%;
+    opacity: 0.8;
+  }
+}
+
+.animate-scan-laser {
+  animation: scan-laser 2.2s ease-in-out infinite;
+}
+
 .medical-card {
-  @apply bg-white border border-slate-200/80 rounded-2xl shadow-medical-card transition-all duration-200;
-}
-
-.medical-card:hover {
-  @apply shadow-medical-lg border-slate-300/80;
+  background: #ffffff;
+  border: 1px solid #dfe5df;
+  border-radius: 0.75rem;
+  box-shadow: 0 8px 28px rgba(16, 42, 67, 0.06);
 }
 
 /* Focus styles for clean medical UI */
 input:focus, select:focus, textarea:focus {
-  @apply outline-none ring-2 ring-brand-500/20 border-brand-600;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(46, 119, 114, 0.12);
+  border-color: #2e7772;
 }

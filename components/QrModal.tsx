@@ -1,9 +1,8 @@
 "use client";
 
-import React, { useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { QRCodeCanvas } from "qrcode.react";
-import { X, Download, Printer, ExternalLink, ShieldCheck, Pill } from "lucide-react";
-import { BatchDetail } from "@/frontend-exports/blockchain/types";
+import { X, Download, Printer, ShieldCheck, Pill } from "lucide-react";
 
 interface QrModalProps {
   batch: {
@@ -20,13 +19,16 @@ interface QrModalProps {
 
 export default function QrModal({ batch, isOpen, onClose }: QrModalProps) {
   const qrRef = useRef<HTMLDivElement>(null);
+  const [origin, setOrigin] = useState("");
+
+  useEffect(() => {
+    setOrigin(window.location.origin);
+  }, []);
 
   if (!isOpen) return null;
 
-  // Verification URL or Batch ID
-  const verificationUrl = typeof window !== "undefined"
-    ? `${window.location.origin}/?batchId=${encodeURIComponent(batch.batchId)}`
-    : `https://obtentik.id/verify/${batch.batchId}`;
+  const cleanBatchId = (batch.batchId || "").trim();
+  const verificationUrl = `${origin}/?batchId=${encodeURIComponent(cleanBatchId)}`;
 
   // Download QR Code as PNG
   const handleDownload = () => {
@@ -35,7 +37,7 @@ export default function QrModal({ batch, isOpen, onClose }: QrModalProps) {
 
     const url = canvas.toDataURL("image/png");
     const link = document.createElement("a");
-    link.download = `QR-OBTENTIK-${batch.batchId}.png`;
+    link.download = `QR-OBTENTIK-${cleanBatchId}.png`;
     link.href = url;
     link.click();
   };
@@ -62,9 +64,9 @@ export default function QrModal({ batch, isOpen, onClose }: QrModalProps) {
           <div className="w-12 h-12 bg-brand-50 border border-brand-200 text-brand-600 rounded-2xl flex items-center justify-center mx-auto mb-3">
             <Pill className="w-6 h-6" />
           </div>
-          <h3 className="text-lg font-bold text-slate-900">QR Code Kemasan Obat</h3>
+          <h3 className="text-lg font-bold text-slate-900">Kode QR Kemasan Obat</h3>
           <p className="text-xs text-slate-500 mt-1">
-            Dicetak pada blister, botol, atau box kemasan sekunder untuk verifikasi konsumen & rantai pasok.
+            Dicetak pada blister, botol, atau kotak kemasan sekunder untuk verifikasi konsumen dan rantai pasok.
           </p>
         </div>
 
@@ -76,7 +78,7 @@ export default function QrModal({ batch, isOpen, onClose }: QrModalProps) {
           {/* QR Code Canvas */}
           <div className="p-3 bg-white rounded-2xl shadow-sm border border-slate-200/80 mb-3">
             <QRCodeCanvas
-              value={batch.batchId}
+              value={verificationUrl}
               size={180}
               level="H"
               includeMargin={true}
@@ -84,7 +86,7 @@ export default function QrModal({ batch, isOpen, onClose }: QrModalProps) {
           </div>
 
           <div className="font-mono text-sm font-bold text-brand-700 bg-brand-50 px-3 py-1 rounded-lg border border-brand-200/60 mb-2">
-            {batch.batchId}
+            {cleanBatchId}
           </div>
 
           <div className="space-y-0.5 text-xs text-slate-600 w-full text-left bg-white p-3 rounded-xl border border-slate-200">
@@ -108,7 +110,7 @@ export default function QrModal({ batch, isOpen, onClose }: QrModalProps) {
             )}
             {batch.expiryDateFormatted && (
               <div className="flex justify-between">
-                <span className="text-slate-400">Exp Date:</span>
+                <span className="text-slate-400">Tanggal kedaluwarsa:</span>
                 <span className="font-bold text-emerald-700">{batch.expiryDateFormatted}</span>
               </div>
             )}
@@ -116,7 +118,7 @@ export default function QrModal({ batch, isOpen, onClose }: QrModalProps) {
 
           <div className="flex items-center gap-1.5 mt-3 text-[11px] text-slate-400 font-medium">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Terikat On-Chain ke Polygon Amoy (80002)</span>
+            <span>Tercatat permanen di Polygon Amoy (80002)</span>
           </div>
         </div>
 

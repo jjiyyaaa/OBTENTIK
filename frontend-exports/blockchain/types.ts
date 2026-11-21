@@ -31,9 +31,9 @@ export type SupplyChainStageName = "Manufactured" | "Distributed" | "AtPharmacy"
  * Human-readable mapping for supply chain stages
  */
 export const STAGE_LABELS: Record<SupplyChainStage, string> = {
-  [SupplyChainStage.Manufactured]: "Diproduksi (Manufacturer)",
-  [SupplyChainStage.Distributed]: "Didistribusikan (Distributor)",
-  [SupplyChainStage.AtPharmacy]: "Tersedia di Apotek (Pharmacy)",
+  [SupplyChainStage.Manufactured]: "Diproduksi",
+  [SupplyChainStage.Distributed]: "Didistribusikan",
+  [SupplyChainStage.AtPharmacy]: "Tersedia di apotek",
 };
 
 /**
@@ -147,7 +147,7 @@ export interface WalletState {
   isCorrectNetwork: boolean;
   isConnected: boolean;
   isConnecting: boolean;
-  role: UserRole;
+  role: UserRole | null;
   actorName: string;
   error: string | null;
 }

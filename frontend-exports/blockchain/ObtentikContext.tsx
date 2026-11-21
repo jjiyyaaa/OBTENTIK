@@ -11,6 +11,7 @@ import React, {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
 } from "react";
 import { BrowserProvider, JsonRpcSigner } from "ethers";
@@ -20,6 +21,7 @@ import {
 } from "./chains";
 import {
   connectMetaMask,
+  getInjectedProvider,
   isMetaMaskInstalled,
   setupMetaMaskListeners,
   switchToPolygonAmoy,
@@ -80,6 +82,7 @@ export interface ObtentikContextValue extends WalletState {
 }
 
 const ObtentikContext = createContext<ObtentikContextValue | null>(null);
+const AUTO_CONNECT_DISABLED_KEY = "obtentik-wallet-autoconnect-disabled";
 
 export interface ObtentikProviderProps {
   children: React.ReactNode;
@@ -88,18 +91,19 @@ export interface ObtentikProviderProps {
 
 export const ObtentikProvider: React.FC<ObtentikProviderProps> = ({
   children,
-  autoConnect = true,
+  autoConnect = false,
 }) => {
   const [account, setAccount] = useState<string | null>(null);
   const [chainId, setChainId] = useState<number | null>(null);
   const [isCorrectNetwork, setIsCorrectNetwork] = useState<boolean>(false);
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const [isConnecting, setIsConnecting] = useState<boolean>(false);
-  const [role, setRole] = useState<UserRole>("CONSUMER");
+  const [role, setRole] = useState<UserRole | null>(null);
   const [actorName, setActorName] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [provider, setProvider] = useState<BrowserProvider | null>(null);
   const [signer, setSigner] = useState<JsonRpcSigner | null>(null);
+  const autoConnectTaskRef = useRef<Promise<void> | null>(null);
 
   /**
    * Updates user role and corporate name for a specific account
@@ -112,15 +116,17 @@ export const ObtentikProvider: React.FC<ObtentikProviderProps> = ({
       ]);
       setRole(detectedRole);
       setActorName(detectedName);
+      setError(null);
     } catch (err: any) {
       console.warn("Could not fetch user metadata:", err);
-      setRole("CONSUMER");
+      setRole(null);
       setActorName("");
+      setError(err.message || "Gagal memuat peran akun dari Polygon Amoy.");
     }
   }, []);
 
   /**
-   * Manually or automatically initiates connection with MetaMask
+   * Initiates a user-requested connection with MetaMask
    */
   const connect = useCallback(async () => {
     if (!isMetaMaskInstalled()) {
@@ -129,6 +135,10 @@ export const ObtentikProvider: React.FC<ObtentikProviderProps> = ({
     }
 
     try {
+      window.sessionStorage.removeItem(AUTO_CONNECT_DISABLED_KEY);
+      if (!autoConnectTaskRef.current) {
+        autoConnectTaskRef.current = Promise.resolve();
+      }
       setIsConnecting(true);
       setError(null);
 
@@ -140,6 +150,7 @@ export const ObtentikProvider: React.FC<ObtentikProviderProps> = ({
       setIsCorrectNetwork(conn.isCorrectNetwork);
       setRole(conn.role);
       setActorName(conn.actorName);
+      setError(conn.profileError);
       setIsConnected(true);
     } catch (err: any) {
       setError(err.message || "Gagal menghubungkan ke MetaMask.");
@@ -153,13 +164,14 @@ export const ObtentikProvider: React.FC<ObtentikProviderProps> = ({
    * Resets wallet connection state
    */
   const disconnect = useCallback(() => {
+    window.sessionStorage.setItem(AUTO_CONNECT_DISABLED_KEY, "true");
     setAccount(null);
     setProvider(null);
     setSigner(null);
     setChainId(null);
     setIsCorrectNetwork(false);
     setIsConnected(false);
-    setRole("CONSUMER");
+    setRole(null);
     setActorName("");
     setError(null);
   }, []);
@@ -174,6 +186,9 @@ export const ObtentikProvider: React.FC<ObtentikProviderProps> = ({
       if (switched) {
         setIsCorrectNetwork(true);
         setChainId(POLYGON_AMOY_CHAIN.chainId);
+      } else {
+        setIsCorrectNetwork(false);
+        setError("MetaMask belum beralih ke Polygon Amoy.");
       }
       return switched;
     } catch (err: any) {
@@ -191,29 +206,59 @@ export const ObtentikProvider: React.FC<ObtentikProviderProps> = ({
     }
   }, [account, loadAccountMetadata]);
 
+  const assertAuthorizedRole = useCallback(
+    (allowedRoles: readonly UserRole[]) => {
+      if (!isConnected || !account || !signer) {
+        throw new Error("Hubungkan dompet MetaMask sebelum melakukan transaksi.");
+      }
+      if (!isCorrectNetwork) {
+        throw new Error("Transaksi hanya dapat ditandatangani di Polygon Amoy.");
+      }
+      if (!role || !allowedRoles.includes(role)) {
+        throw new Error(`Peran ${role ?? "belum tersedia"} tidak memiliki izin untuk tindakan ini.`);
+      }
+    },
+    [account, isConnected, isCorrectNetwork, role, signer]
+  );
+
   // Setup MetaMask event listeners
   useEffect(() => {
-    if (!isMetaMaskInstalled()) return;
+    const ethereum = getInjectedProvider();
+    if (!ethereum) return;
 
     const cleanup = setupMetaMaskListeners({
       onAccountChanged: async (accounts) => {
+        if (!isConnected) return;
+
         if (!accounts || accounts.length === 0) {
           disconnect();
         } else {
           const newAccount = accounts[0];
           setAccount(newAccount);
           setIsConnected(true);
-          const prov = new BrowserProvider(window.ethereum);
-          setProvider(prov);
-          const sig = await prov.getSigner(newAccount);
-          setSigner(sig);
-          await loadAccountMetadata(newAccount);
+          setRole(null);
+          setActorName("");
+          try {
+            const prov = new BrowserProvider(ethereum);
+            const sig = await prov.getSigner(newAccount);
+            setProvider(prov);
+            setSigner(sig);
+            await loadAccountMetadata(newAccount);
+          } catch (err: any) {
+            setError(err.message || "Gagal memuat akun MetaMask yang dipilih.");
+          }
         }
       },
-      onChainChanged: (newChainIdHex) => {
+      onChainChanged: async (newChainIdHex) => {
         const correct = isPolygonAmoy(newChainIdHex);
         setIsCorrectNetwork(correct);
         setChainId(parseInt(newChainIdHex, 16));
+        if (correct && account) {
+          await loadAccountMetadata(account);
+        } else if (!correct) {
+          setRole(null);
+          setActorName("");
+        }
       },
       onDisconnect: () => {
         disconnect();
@@ -221,69 +266,80 @@ export const ObtentikProvider: React.FC<ObtentikProviderProps> = ({
     });
 
     // Check if wallet is already connected
-    if (autoConnect && window.ethereum) {
-      window.ethereum
-        .request({ method: "eth_accounts" })
-        .then(async (accounts: string[]) => {
-          if (accounts && accounts.length > 0) {
-            const currentAccount = accounts[0];
-            const prov = new BrowserProvider(window.ethereum);
-            const sig = await prov.getSigner(currentAccount);
-            const net = await prov.getNetwork();
-            const currentChain = Number(net.chainId);
+    const autoConnectDisabled =
+      window.sessionStorage.getItem(AUTO_CONNECT_DISABLED_KEY) === "true";
+    if (autoConnect && !autoConnectDisabled && !autoConnectTaskRef.current) {
+      autoConnectTaskRef.current = (async () => {
+        const result = await ethereum.request({ method: "eth_accounts" });
+        const accounts = Array.isArray(result)
+          ? result.filter((item): item is string => typeof item === "string")
+          : [];
+        if (accounts.length === 0) return;
 
-            setAccount(currentAccount);
-            setProvider(prov);
-            setSigner(sig);
-            setChainId(currentChain);
-            setIsCorrectNetwork(isPolygonAmoy(currentChain));
-            setIsConnected(true);
-            await loadAccountMetadata(currentAccount);
-          }
-        })
-        .catch(() => {
-          // Silent fallback
-        });
+        const currentAccount = accounts[0];
+        const prov = new BrowserProvider(ethereum);
+        const [sig, net] = await Promise.all([
+          prov.getSigner(currentAccount),
+          prov.getNetwork(),
+        ]);
+        const currentChain = Number(net.chainId);
+
+        setAccount(currentAccount);
+        setProvider(prov);
+        setSigner(sig);
+        setChainId(currentChain);
+        setIsCorrectNetwork(isPolygonAmoy(currentChain));
+        setIsConnected(true);
+        setError(null);
+        await loadAccountMetadata(currentAccount);
+      })().catch((err: unknown) => {
+        console.warn("Could not restore MetaMask connection:", err);
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Gagal memulihkan koneksi MetaMask."
+        );
+      });
     }
 
     return cleanup;
-  }, [autoConnect, disconnect, loadAccountMetadata]);
+  }, [account, autoConnect, disconnect, isConnected, loadAccountMetadata]);
 
   // Authenticated Transaction Wrappers (Passing current signer)
-  const handleRegisterManufacturer = useCallback(
-    (acc: string, name: string) => registerManufacturer(acc, name, signer || undefined),
-    [signer]
-  );
+  const handleRegisterManufacturer = useCallback((acc: string, name: string) => {
+    assertAuthorizedRole(["ADMIN"]);
+    return registerManufacturer(acc, name, signer || undefined);
+  }, [assertAuthorizedRole, signer]);
 
-  const handleRegisterDistributor = useCallback(
-    (acc: string, name: string) => registerDistributor(acc, name, signer || undefined),
-    [signer]
-  );
+  const handleRegisterDistributor = useCallback((acc: string, name: string) => {
+    assertAuthorizedRole(["ADMIN"]);
+    return registerDistributor(acc, name, signer || undefined);
+  }, [assertAuthorizedRole, signer]);
 
-  const handleRegisterPharmacy = useCallback(
-    (acc: string, name: string) => registerPharmacy(acc, name, signer || undefined),
-    [signer]
-  );
+  const handleRegisterPharmacy = useCallback((acc: string, name: string) => {
+    assertAuthorizedRole(["ADMIN"]);
+    return registerPharmacy(acc, name, signer || undefined);
+  }, [assertAuthorizedRole, signer]);
 
-  const handleRegisterBatch = useCallback(
-    (input: RegisterBatchInput) => registerBatch(input, signer || undefined),
-    [signer]
-  );
+  const handleRegisterBatch = useCallback((input: RegisterBatchInput) => {
+    assertAuthorizedRole(["ADMIN", "MANUFACTURER"]);
+    return registerBatch(input, signer || undefined);
+  }, [assertAuthorizedRole, signer]);
 
-  const handleAddCheckpoint = useCallback(
-    (input: AddCheckpointInput) => addCheckpoint(input, signer || undefined),
-    [signer]
-  );
+  const handleAddCheckpoint = useCallback((input: AddCheckpointInput) => {
+    assertAuthorizedRole(["DISTRIBUTOR", "PHARMACY"]);
+    return addCheckpoint(input, signer || undefined);
+  }, [assertAuthorizedRole, signer]);
 
-  const handleVerifyCheckpoint = useCallback(
-    (input: AddCheckpointInput) => verifyCheckpoint(input, signer || undefined),
-    [signer]
-  );
+  const handleVerifyCheckpoint = useCallback((input: AddCheckpointInput) => {
+    assertAuthorizedRole(["DISTRIBUTOR", "PHARMACY"]);
+    return verifyCheckpoint(input, signer || undefined);
+  }, [assertAuthorizedRole, signer]);
 
-  const handleSetBatchRecallStatus = useCallback(
-    (input: SetBatchRecallInput) => setBatchRecallStatus(input, signer || undefined),
-    [signer]
-  );
+  const handleSetBatchRecallStatus = useCallback((input: SetBatchRecallInput) => {
+    assertAuthorizedRole(["ADMIN", "MANUFACTURER"]);
+    return setBatchRecallStatus(input, signer || undefined);
+  }, [assertAuthorizedRole, signer]);
 
   const value: ObtentikContextValue = {
     account,

@@ -4,12 +4,13 @@
  * Uses ethers.js JsonRpcProvider connected to Polygon Amoy Testnet.
  */
 
-import { Contract, JsonRpcProvider } from "ethers";
+import { Contract, FetchRequest, JsonRpcProvider } from "ethers";
 import { OBTENTIK_ABI } from "../ObtentikConfig";
 import {
   POLYGON_AMOY_CHAIN,
   getContractAddress,
   getPublicRpcUrl,
+  getPublicRpcUrlCount,
 } from "./chains";
 import {
   BatchDetail,
@@ -22,9 +23,9 @@ import {
 } from "./types";
 
 /**
- * Singleton or dynamically created JsonRpcProvider with fallback mechanism
+ * Reuses JsonRpcProvider instances per endpoint so concurrent reads can fail over safely
  */
-let cachedProvider: JsonRpcProvider | null = null;
+const cachedProviders = new Map<string, JsonRpcProvider>();
 let currentRpcIndex = 0;
 
 /**
@@ -47,29 +48,33 @@ export function getStageName(stage: number): SupplyChainStageName {
  * Creates or retrieves a reliable Read-Only JsonRpcProvider for Polygon Amoy
  */
 export function getReadOnlyProvider(forceNew = false): JsonRpcProvider {
+  const rpcUrl = getPublicRpcUrl(currentRpcIndex);
+  const cachedProvider = cachedProviders.get(rpcUrl);
   if (cachedProvider && !forceNew) {
     return cachedProvider;
   }
+  cachedProvider?.destroy();
 
-  const rpcUrl = getPublicRpcUrl(currentRpcIndex);
-  cachedProvider = new JsonRpcProvider(rpcUrl, {
+  const request = new FetchRequest(rpcUrl);
+  request.timeout = 15_000;
+  request.setThrottleParams({ maxAttempts: 1 });
+  const provider = new JsonRpcProvider(request, {
     chainId: POLYGON_AMOY_CHAIN.chainId,
     name: "polygon-amoy",
+  }, {
+    staticNetwork: true,
   });
+  cachedProviders.set(rpcUrl, provider);
 
-  return cachedProvider;
+  return provider;
 }
 
 /**
  * Rotates to the next public RPC endpoint in case of rate limits or failures
  */
 export function rotateReadOnlyProvider(): JsonRpcProvider {
-  currentRpcIndex = (currentRpcIndex + 1) % POLYGON_AMOY_CHAIN.rpcUrls.length;
-  cachedProvider = new JsonRpcProvider(getPublicRpcUrl(currentRpcIndex), {
-    chainId: POLYGON_AMOY_CHAIN.chainId,
-    name: "polygon-amoy",
-  });
-  return cachedProvider;
+  currentRpcIndex = (currentRpcIndex + 1) % getPublicRpcUrlCount();
+  return getReadOnlyProvider();
 }
 
 /**
@@ -79,6 +84,27 @@ export function getReadOnlyContract(): Contract {
   const provider = getReadOnlyProvider();
   const address = getContractAddress();
   return new Contract(address, OBTENTIK_ABI, provider);
+}
+
+async function withReadOnlyFallback<T>(
+  read: (contract: Contract) => Promise<T>
+): Promise<T> {
+  let lastError: unknown;
+  const rpcCount = getPublicRpcUrlCount();
+
+  for (let attempt = 0; attempt < rpcCount; attempt += 1) {
+    if (attempt > 0) {
+      rotateReadOnlyProvider();
+    }
+
+    try {
+      return await read(getReadOnlyContract());
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError ?? new Error("Semua endpoint RPC Polygon Amoy gagal diakses.");
 }
 
 /**
@@ -121,66 +147,32 @@ export async function verifyBatch(batchId: string): Promise<BatchVerificationRes
     };
   }
 
-  try {
-    const contract = getReadOnlyContract();
-    const result = await contract.verifyBatch(cleanId);
+  const result = await withReadOnlyFallback((contract) =>
+    contract.verifyBatch(cleanId)
+  );
+  const isValid = Boolean(result[0]);
+  const isAuthentic = Boolean(result[1]);
+  const isRecalled = Boolean(result[2]);
+  const isExpired = Boolean(result[3]);
+  const currentStage = Number(result[4]) as SupplyChainStage;
+  const statusMessage = String(result[5]);
+  const checkpointCount = Number(result[6]);
+  const stageName = getStageName(currentStage);
+  const stageLabel = STAGE_LABELS[currentStage] || "Tidak Diketahui";
 
-    const isValid = Boolean(result[0]);
-    const isAuthentic = Boolean(result[1]);
-    const isRecalled = Boolean(result[2]);
-    const isExpired = Boolean(result[3]);
-    const currentStage = Number(result[4]) as SupplyChainStage;
-    const statusMessage = String(result[5]);
-    const checkpointCount = Number(result[6]);
-
-    const stageName = getStageName(currentStage);
-    const stageLabel = STAGE_LABELS[currentStage] || "Tidak Diketahui";
-    const isSafeForConsumption = isValid && isAuthentic && !isRecalled && !isExpired;
-
-    return {
-      batchId: cleanId,
-      isValid,
-      isAuthentic,
-      isRecalled,
-      isExpired,
-      currentStage,
-      currentStageName: stageName,
-      currentStageLabel: stageLabel,
-      statusMessage,
-      checkpointCount,
-      isSafeForConsumption,
-    };
-  } catch (error) {
-    // If first RPC had a transient error, try rotating once
-    try {
-      rotateReadOnlyProvider();
-      const contract = getReadOnlyContract();
-      const result = await contract.verifyBatch(cleanId);
-      const isValid = Boolean(result[0]);
-      const isAuthentic = Boolean(result[1]);
-      const isRecalled = Boolean(result[2]);
-      const isExpired = Boolean(result[3]);
-      const currentStage = Number(result[4]) as SupplyChainStage;
-      const statusMessage = String(result[5]);
-      const checkpointCount = Number(result[6]);
-
-      return {
-        batchId: cleanId,
-        isValid,
-        isAuthentic,
-        isRecalled,
-        isExpired,
-        currentStage,
-        currentStageName: getStageName(currentStage),
-        currentStageLabel: STAGE_LABELS[currentStage],
-        statusMessage,
-        checkpointCount,
-        isSafeForConsumption: isValid && isAuthentic && !isRecalled && !isExpired,
-      };
-    } catch {
-      throw error;
-    }
-  }
+  return {
+    batchId: cleanId,
+    isValid,
+    isAuthentic,
+    isRecalled,
+    isExpired,
+    currentStage,
+    currentStageName: stageName,
+    currentStageLabel: stageLabel,
+    statusMessage,
+    checkpointCount,
+    isSafeForConsumption: isValid && isAuthentic && !isRecalled && !isExpired,
+  };
 }
 
 /**
@@ -190,8 +182,9 @@ export async function verifyBatch(batchId: string): Promise<BatchVerificationRes
  */
 export async function getBatchDetail(batchId: string): Promise<BatchDetail> {
   const cleanId = batchId.trim();
-  const contract = getReadOnlyContract();
-  const result = await contract.getBatchDetail(cleanId);
+  const result = await withReadOnlyFallback((contract) =>
+    contract.getBatchDetail(cleanId)
+  );
 
   const batchIdOut = String(result[0]);
   const productName = String(result[1]);
@@ -239,8 +232,9 @@ export async function getBatchDetail(batchId: string): Promise<BatchDetail> {
  */
 export async function getBatchCheckpoints(batchId: string): Promise<CheckpointData[]> {
   const cleanId = batchId.trim();
-  const contract = getReadOnlyContract();
-  const rawCheckpoints = await contract.getBatchCheckpoints(cleanId);
+  const rawCheckpoints = await withReadOnlyFallback((contract) =>
+    contract.getBatchCheckpoints(cleanId)
+  );
 
   return rawCheckpoints.map((cp: any) => {
     const stage = Number(cp.stage) as SupplyChainStage;
@@ -269,13 +263,10 @@ export async function getBatchCheckpoints(batchId: string): Promise<CheckpointDa
  * @param account Wallet address of actor
  */
 export async function getActorName(account: string): Promise<string> {
-  if (!account || !account.startsWith("0x")) return "";
-  try {
-    const contract = getReadOnlyContract();
-    return await contract.actorNames(account);
-  } catch {
-    return "";
+  if (!account || !account.startsWith("0x")) {
+    throw new Error("Alamat akun tidak valid untuk membaca nama aktor.");
   }
+  return withReadOnlyFallback((contract) => contract.actorNames(account));
 }
 
 /**
@@ -285,38 +276,36 @@ export async function getActorName(account: string): Promise<string> {
  * @returns "ADMIN" | "MANUFACTURER" | "DISTRIBUTOR" | "PHARMACY" | "CONSUMER"
  */
 export async function getUserRole(account: string): Promise<UserRole> {
-  if (!account || !account.startsWith("0x")) return "CONSUMER";
-  try {
-    const contract = getReadOnlyContract();
-    const role = await contract.getUserRole(account);
-    return role as UserRole;
-  } catch {
-    return "CONSUMER";
+  if (!account || !account.startsWith("0x")) {
+    throw new Error("Alamat akun tidak valid untuk membaca peran.");
   }
+  const role = String(
+    await withReadOnlyFallback((contract) => contract.getUserRole(account))
+  );
+  if (
+    role !== "ADMIN" &&
+    role !== "MANUFACTURER" &&
+    role !== "DISTRIBUTOR" &&
+    role !== "PHARMACY" &&
+    role !== "CONSUMER"
+  ) {
+    throw new Error(`Peran on-chain tidak dikenal: ${role}`);
+  }
+  return role;
 }
 
 /**
  * 6. Get total number of registered batches
  */
 export async function getBatchCount(): Promise<number> {
-  try {
-    const contract = getReadOnlyContract();
-    const count = await contract.getBatchCount();
-    return Number(count);
-  } catch {
-    return 0;
-  }
+  const count = await withReadOnlyFallback((contract) => contract.getBatchCount());
+  return Number(count);
 }
 
 /**
  * 7. Get list of all registered batch IDs
  */
 export async function getAllBatches(): Promise<string[]> {
-  try {
-    const contract = getReadOnlyContract();
-    const batches = await contract.getAllBatches();
-    return Array.from(batches);
-  } catch {
-    return [];
-  }
+  const batches = await withReadOnlyFallback((contract) => contract.getAllBatches());
+  return Array.from(batches);
 }

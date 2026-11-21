@@ -125,7 +125,7 @@ export interface WalletState {
     isCorrectNetwork: boolean;
     isConnected: boolean;
     isConnecting: boolean;
-    role: UserRole;
+    role: UserRole | null;
     actorName: string;
     error: string | null;
 }

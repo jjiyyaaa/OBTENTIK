@@ -1,14 +1,18 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { ObtentikProvider } from "@/frontend-exports";
+import {
+  getContractAddress,
+  getExplorerAddressUrl,
+} from "@/frontend-exports/blockchain/chains";
 import Navbar from "@/components/Navbar";
 import NetworkAlert from "@/components/NetworkAlert";
 import { ShieldCheck, HeartPulse, ExternalLink } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "OBTENTIK - Verifikasi & Rantai Pasok Obat Farmasi Blockchain",
+  title: "OBTENTIK - Verifikasi & Rantai Pasok Obat Berbasis Blockchain",
   description:
-    "Sistem ketertelusuran rantai pasok obat farmasi dan verifikasi keaslian obat terdesentralisasi di Polygon Amoy Testnet (Chain ID 80002) oleh Tim imouttt (President University).",
+    "Sistem ketertelusuran rantai pasok farmasi dan verifikasi keaslian obat terdesentralisasi di jaringan uji Polygon Amoy (ID jaringan 80002) oleh Tim imouttt (President University).",
 };
 
 export default function RootLayout({
@@ -16,38 +20,53 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const contractAddress = getContractAddress();
+
   return (
     <html lang="id">
-      <body className="bg-surface-50 text-slate-900 min-h-screen flex flex-col font-sans selection:bg-brand-500/20 selection:text-brand-700">
+      <body className="medical-ambient-bg text-slate-900 min-h-screen flex flex-col font-sans selection:bg-teal-100 selection:text-teal-900">
         <ObtentikProvider>
           <NetworkAlert />
           <Navbar />
           <main className="flex-1">{children}</main>
 
-          {/* Clean Medical Footer */}
-          <footer className="bg-white border-t border-slate-200 py-8 px-4 sm:px-6 lg:px-8 mt-16 text-xs text-slate-500">
-            <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-              <div className="flex items-center gap-2.5">
-                <div className="w-7 h-7 bg-brand-50 text-brand-600 rounded-lg flex items-center justify-center border border-brand-200">
-                  <ShieldCheck className="w-4 h-4" />
+          <footer className="border-t border-slate-200 bg-[#081f34] text-slate-300">
+            <div className="mx-auto max-w-[1440px] px-5 py-14 sm:px-8 lg:px-12">
+              <div className="grid gap-10 md:grid-cols-[1.4fr_1fr_1fr]">
+                <div>
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#35786f] text-white">
+                      <ShieldCheck className="h-5 w-5" />
+                    </div>
+                    <span className="text-xl font-bold text-white">OBTENTIK</span>
+                  </div>
+                  <p className="mt-5 max-w-sm text-sm leading-7 text-slate-300">
+                    Verifikasi keaslian obat untuk publik dan ketertelusuran rantai pasok farmasi yang transparan.
+                  </p>
                 </div>
                 <div>
-                  <div className="font-bold text-slate-800">
-                    OBTENTIK Pharmaceutical Supply Chain Traceability
+                  <h2 className="text-xs font-bold uppercase tracking-[0.16em] text-[#a9d5ca]">Jelajahi</h2>
+                  <div className="mt-5 space-y-3 text-sm">
+                    <a className="block hover:text-white" href="/">Verifikasi obat</a>
+                    <a className="block hover:text-white" href="/scanner">Pemindai verifikasi</a>
+                    <a className="block hover:text-white" href="/admin">Admin & produsen</a>
                   </div>
                 </div>
+                <div>
+                  <h2 className="text-xs font-bold uppercase tracking-[0.16em] text-[#a9d5ca]">Jaringan</h2>
+                  <p className="mt-5 text-sm">Polygon Amoy · Chain ID 80002</p>
+                  <a
+                    href={getExplorerAddressUrl(contractAddress)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-3 inline-flex items-center gap-1.5 font-mono text-xs text-slate-300 hover:text-white"
+                  >
+                    {`${contractAddress.slice(0, 6)}...${contractAddress.slice(-4)}`} <ExternalLink className="h-3 w-3" />
+                  </a>
+                </div>
               </div>
-
-              <div className="flex flex-wrap items-center gap-4 text-slate-500 text-[11px]">
-                <a
-                  href="https://amoy.polygonscan.com/address/0x511251E3b80e72d437E479B6D6039992Db813049"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:text-brand-600 flex items-center gap-1 transition"
-                >
-                  <span>Smart Contract on Amoy (0x5112...3049)</span>
-                  <ExternalLink className="w-3 h-3" />
-                </a>
+              <div className="mt-12 border-t border-white/10 pt-6 text-xs text-slate-400">
+                © {new Date().getFullYear()} OBTENTIK
               </div>
             </div>
           </footer>

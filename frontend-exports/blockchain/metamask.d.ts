@@ -16,7 +16,7 @@ export interface MetaMaskConnectionResult {
     signer: JsonRpcSigner;
     chainId: number;
     isCorrectNetwork: boolean;
-    role: UserRole;
+    role: UserRole | null;
     actorName: string;
 }
 /**

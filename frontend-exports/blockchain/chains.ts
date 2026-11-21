@@ -30,9 +30,10 @@ export const POLYGON_AMOY_CHAIN: ChainConfig = {
     decimals: 18,
   },
   rpcUrls: [
-    "https://rpc-amoy.polygon.technology/",
     "https://polygon-amoy-bor-rpc.publicnode.com",
-    "https://amoy.drpc.org",
+    "https://polygon-amoy.drpc.org",
+    "https://polygon-amoy.gateway.tenderly.co",
+    "https://rpc-amoy.polygon.technology/",
   ] as const,
   blockExplorerUrls: [
     "https://amoy.polygonscan.com",
@@ -68,10 +69,20 @@ export function getContractAddress(): string {
  * Get primary or fallback RPC URL
  */
 export function getPublicRpcUrl(index = 0): string {
-  if (typeof process !== "undefined" && process.env?.NEXT_PUBLIC_POLYGON_AMOY_RPC) {
-    return process.env.NEXT_PUBLIC_POLYGON_AMOY_RPC;
-  }
-  return POLYGON_AMOY_CHAIN.rpcUrls[index % POLYGON_AMOY_CHAIN.rpcUrls.length];
+  const rpcUrls = getPublicRpcUrls();
+  return rpcUrls[((index % rpcUrls.length) + rpcUrls.length) % rpcUrls.length];
+}
+
+export function getPublicRpcUrlCount(): number {
+  return getPublicRpcUrls().length;
+}
+
+function getPublicRpcUrls(): readonly string[] {
+  const configuredRpc =
+    typeof process !== "undefined" ? process.env?.NEXT_PUBLIC_POLYGON_AMOY_RPC : undefined;
+  return configuredRpc
+    ? [configuredRpc, ...POLYGON_AMOY_CHAIN.rpcUrls]
+    : POLYGON_AMOY_CHAIN.rpcUrls;
 }
 
 /**
