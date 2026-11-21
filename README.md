@@ -338,3 +338,4 @@ await registerPharmacy("0x789...", "Apotek Kimia Farma Juanda");
 
 ## 📄 Lisensi
 Proyek ini dilisensikan di bawah lisensi **MIT**.
+"# OBTENTIK" 
