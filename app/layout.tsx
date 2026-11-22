@@ -12,7 +12,7 @@ import { ShieldCheck, HeartPulse, ExternalLink } from "lucide-react";
 export const metadata: Metadata = {
   title: "OBTENTIK - Verifikasi & Rantai Pasok Obat Berbasis Blockchain",
   description:
-    "Sistem ketertelusuran rantai pasok farmasi dan verifikasi keaslian obat terdesentralisasi di jaringan uji Polygon Amoy (ID jaringan 80002) oleh Tim imouttt (President University).",
+    "Sistem ketertelusuran rantai pasok farmasi dan verifikasi keaslian obat terdesentralisasi.",
 };
 
 export default function RootLayout({
