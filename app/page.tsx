@@ -142,10 +142,19 @@ function ConsumerPageContent() {
     [executeVerification],
   );
 
+  useEffect(() => {
+    if (showScanner) {
+      document.getElementById("qr-scanner")?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }
+  }, [showScanner]);
+
   const scrollToVerify = () => {
     document
-      .getElementById("verification")
-      ?.scrollIntoView({ behavior: "smooth" });
+      .getElementById("verification-label")
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
   return (
@@ -184,10 +193,7 @@ function ConsumerPageContent() {
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  setShowScanner(true);
-                  scrollToVerify();
-                }}
+                onClick={() => setShowScanner(true)}
                 className="inline-flex h-14 items-center justify-center gap-2 rounded-md border border-white/50 px-6 text-sm font-bold text-white"
               >
                 <ScanLine className="h-4 w-4" />
@@ -249,7 +255,10 @@ function ConsumerPageContent() {
         <div className="mx-auto max-w-[1440px] px-5 sm:px-8 lg:px-12 py-16 sm:py-24">
           <div className="grid lg:grid-cols-[.82fr_1.18fr] gap-12 lg:gap-20 items-center">
             <div className="order-2 lg:order-1">
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#35786f]">
+              <p
+                id="verification-label"
+                className="scroll-mt-24 text-xs font-bold uppercase tracking-[0.18em] text-[#35786f]"
+              >
                 Verifikasi publik
               </p>
               <h2 className="mt-4 max-w-[520px] text-4xl sm:text-5xl font-semibold leading-[1.05] tracking-[-0.035em] text-[#102a43]">
@@ -304,7 +313,10 @@ function ConsumerPageContent() {
                 </button>
 
                 {showScanner && (
-                  <div className="mt-5 rounded-md border border-slate-200 p-3">
+                  <div
+                    id="qr-scanner"
+                    className="mt-5 rounded-md border border-slate-200 p-3"
+                  >
                     <Html5Scanner onScanSuccess={handleScanSuccess} />
                   </div>
                 )}
