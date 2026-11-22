@@ -216,7 +216,12 @@ export default function VerifierScannerPage() {
       </div>
 
       {/* Main Grid: Scanner Left, Details & Checkpoint Form Right */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      {!isConnected && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-xs font-semibold text-amber-900">
+          Hubungkan wallet MetaMask untuk mengaktifkan pemindai dan pencatatan titik pemeriksaan.
+        </div>
+      )}
+      <fieldset disabled={!isConnected} className="grid grid-cols-1 lg:grid-cols-12 gap-8 disabled:opacity-70">
         {/* Left Column: QR Scanner */}
         <div className="lg:col-span-5 space-y-6">
           <div className="bg-white border border-slate-200/90 rounded-3xl p-6 shadow-sm space-y-4">
@@ -224,7 +229,7 @@ export default function VerifierScannerPage() {
               <QrCode className="w-4 h-4 text-teal-600" />
               <span>Pemindai QR Code Kemasan Fisik</span>
             </h2>
-            <Html5Scanner onScanSuccess={handleBatchScanned} />
+            <Html5Scanner onScanSuccess={handleBatchScanned} paused={!isConnected} />
 
             {/* Manual ID Input Fallback */}
             <div className="mt-4 pt-4 border-t border-slate-100">
@@ -234,6 +239,7 @@ export default function VerifierScannerPage() {
               <div className="flex gap-2">
                 <input
                   type="text"
+                  disabled={!isConnected}
                   value={scannedBatchId}
                   onChange={(e) => setScannedBatchId(e.target.value)}
                   placeholder="BATCH-2026-PARA500"
@@ -242,7 +248,7 @@ export default function VerifierScannerPage() {
                 <button
                   type="button"
                   onClick={() => handleBatchScanned(scannedBatchId)}
-                  disabled={loadingBatch || !scannedBatchId.trim()}
+                  disabled={!isConnected || loadingBatch || !scannedBatchId.trim()}
                   className="px-4 py-2.5 bg-navy-900 hover:bg-navy-800 text-white text-xs font-bold rounded-xl transition shadow-sm disabled:opacity-50"
                 >
                   {loadingBatch ? "Cek..." : "Muat"}
@@ -465,6 +471,7 @@ export default function VerifierScannerPage() {
                     <input
                       type="text"
                       required
+                      disabled={!isConnected}
                       value={locationInput}
                       onChange={(e) => setLocationInput(e.target.value)}
                       placeholder="contoh: Gudang PBF Kimia Farma Trading & Distribution, Cikarang"
@@ -489,7 +496,7 @@ export default function VerifierScannerPage() {
                   <div className="pt-2">
                     <button
                       type="submit"
-                      disabled={isSubmitting || !isAuthorizedScanner || !isSequenceValidForRole()}
+                      disabled={!isConnected || isSubmitting || !isAuthorizedScanner || !isSequenceValidForRole()}
                       className="w-full inline-flex items-center justify-center gap-2 bg-gradient-to-r from-navy-900 via-navy-800 to-teal-700 hover:from-navy-850 hover:to-teal-600 active:scale-95 text-white text-xs font-bold py-3.5 rounded-2xl shadow-md transition disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {isSubmitting ? (
@@ -519,7 +526,7 @@ export default function VerifierScannerPage() {
             </div>
           )}
         </div>
-      </div>
+      </fieldset>
     </div>
   );
 }

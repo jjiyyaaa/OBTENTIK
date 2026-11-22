@@ -168,6 +168,7 @@ export default function Html5Scanner({
         <div className="inline-flex items-center gap-1 p-1 bg-surface-100 rounded-xl border border-slate-200/80">
           <button
             onClick={() => setScanMode("camera")}
+                    disabled={paused}
             className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg transition-all ${
               scanMode === "camera"
                 ? "bg-navy-900 text-cyan-300 shadow-sm"
@@ -179,6 +180,7 @@ export default function Html5Scanner({
           </button>
           <button
             onClick={() => setScanMode("file")}
+            disabled={paused}
             className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg transition-all ${
               scanMode === "file"
                 ? "bg-navy-900 text-cyan-300 shadow-sm"
@@ -242,6 +244,7 @@ export default function Html5Scanner({
                 type="file"
                 accept="image/*"
                 onChange={handleFileUpload}
+                disabled={paused}
                 className="hidden"
               />
             </label>

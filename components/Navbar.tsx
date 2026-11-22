@@ -107,6 +107,21 @@ export default function Navbar() {
           <nav className="hidden md:flex items-center gap-7">
             {navLinks.map((link) => {
               const isActive = pathname === link.href;
+              const requiresWallet = link.href !== "/";
+              if (requiresWallet && !isConnected) {
+                return (
+                  <button
+                    key={link.href}
+                    type="button"
+                    disabled
+                    title="Hubungkan wallet terlebih dahulu"
+                    className="flex cursor-not-allowed items-center gap-2 border-b-2 border-transparent py-5 text-sm font-semibold text-slate-300 opacity-60"
+                  >
+                    <span className="text-slate-300">{link.icon}</span>
+                    <span>{link.label}</span>
+                  </button>
+                );
+              }
               return (
                 <Link
                   key={link.href}
@@ -243,6 +258,21 @@ export default function Navbar() {
             <nav aria-label="Navigasi utama" className="space-y-1">
               {navLinks.map((link) => {
                 const isActive = pathname === link.href;
+                const requiresWallet = link.href !== "/";
+                if (requiresWallet && !isConnected) {
+                  return (
+                    <button
+                      key={link.href}
+                      type="button"
+                      disabled
+                      title="Hubungkan wallet terlebih dahulu"
+                      className="flex min-h-12 w-full cursor-not-allowed items-center gap-3 rounded-xl px-3 py-2 text-sm font-semibold text-slate-300 opacity-60"
+                    >
+                      <span className="text-slate-300">{link.icon}</span>
+                      <span>{link.label}</span>
+                    </button>
+                  );
+                }
                 return (
                   <Link
                     key={link.href}

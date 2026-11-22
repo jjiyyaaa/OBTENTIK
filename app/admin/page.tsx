@@ -358,7 +358,12 @@ export default function AdminManufacturerDashboard() {
       </div>
 
       {/* Main SaaS Dashboard Container: Sidebar + Content */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+      {!isConnected && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-xs font-semibold text-amber-900">
+          Hubungkan wallet MetaMask untuk mengakses dan menggunakan fitur admin & produsen.
+        </div>
+      )}
+      <fieldset disabled={!isConnected} className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start disabled:opacity-70">
         {/* Navy Desktop Sidebar */}
         <div className="lg:col-span-3 bg-navy-900 rounded-3xl p-5 text-white shadow-medical-lg space-y-6">
           <div>
@@ -367,6 +372,7 @@ export default function AdminManufacturerDashboard() {
             </div>
             <nav className="space-y-1.5">
               <button
+                disabled={!isConnected}
                 onClick={() => {
                   setActiveTab("batchList");
                   clearTxStatus();
@@ -387,6 +393,7 @@ export default function AdminManufacturerDashboard() {
               </button>
 
               <button
+                disabled={!isConnected}
                 onClick={() => {
                   setActiveTab("registerBatch");
                   clearTxStatus();
@@ -402,6 +409,7 @@ export default function AdminManufacturerDashboard() {
               </button>
 
               <button
+                disabled={!isConnected}
                 onClick={() => {
                   setActiveTab("whitelist");
                   clearTxStatus();
@@ -420,6 +428,7 @@ export default function AdminManufacturerDashboard() {
               </button>
 
               <button
+                disabled={!isConnected}
                 onClick={() => {
                   setActiveTab("recall");
                   clearTxStatus();
@@ -781,7 +790,7 @@ export default function AdminManufacturerDashboard() {
                 <div className="pt-2">
                   <button
                     type="submit"
-                    disabled={txSubmitting || !canRegisterBatch}
+                    disabled={!isConnected || txSubmitting || !canRegisterBatch}
                     className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-gradient-to-r from-navy-900 via-navy-800 to-teal-700 hover:from-navy-850 hover:to-teal-600 active:scale-95 text-white text-xs font-bold px-8 py-3.5 rounded-2xl shadow-md transition disabled:opacity-50"
                   >
                     {txSubmitting ? (
@@ -875,7 +884,7 @@ export default function AdminManufacturerDashboard() {
                 <div className="pt-2">
                   <button
                     type="submit"
-                    disabled={txSubmitting || !isAdmin}
+                    disabled={!isConnected || txSubmitting || !isAdmin}
                     className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-gradient-to-r from-navy-900 via-navy-800 to-teal-700 hover:from-navy-850 hover:to-teal-600 active:scale-95 text-white text-xs font-bold px-8 py-3 rounded-2xl shadow-md transition disabled:opacity-50"
                   >
                     {txSubmitting ? (
@@ -958,7 +967,7 @@ export default function AdminManufacturerDashboard() {
                 <div className="pt-2">
                   <button
                     type="submit"
-                    disabled={txSubmitting || (!isAdmin && !isManufacturer)}
+                    disabled={!isConnected || txSubmitting || (!isAdmin && !isManufacturer)}
                     className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white text-xs font-bold px-8 py-3 rounded-2xl shadow-md transition disabled:opacity-50"
                   >
                     {txSubmitting ? (
@@ -978,7 +987,7 @@ export default function AdminManufacturerDashboard() {
             </div>
           )}
         </div>
-      </div>
+      </fieldset>
 
       {/* QR Code Modal Generator */}
       {selectedBatchForQr && (
